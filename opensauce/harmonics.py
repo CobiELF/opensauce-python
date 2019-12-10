@@ -6,7 +6,28 @@
 from __future__ import division
 
 import numpy as np
+from opensauce.optimization import fminsearchbnd
 
+def get_harmonics(data, f_est, fs):
+    df = 0.1
+    df_range = round(f_est * df)
+
+    f_min = f_est - df_range
+    f_max = f_est + df_range
+
+    f = lambda x: est_max_val(x, data, fs)
+
+    x, val, _, _ = fminsearchbnd(f, f_est, f_min, f_max)
+
+    h = -val
+    fh = x
+    return h, fh
+
+def est_max_val(x, data, fs):
+    n = list(range(len(data)))
+    v = np.exp(-1.j * 2 * np.pi * x * n/fs)
+    val = -1 * 20 * np.log10(abs(data * np.transpose(v)))
+    return val
 
 def correction_iseli_i(f, F_i, B_i, fs):
     """Return the i-th correction (dB) to the harmonic amplitude using the
