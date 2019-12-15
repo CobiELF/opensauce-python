@@ -6,8 +6,92 @@
 from __future__ import division
 
 import numpy as np
-from opensauce.optimization import fminsearchbnd
+from scipy import fftpack
+from .optimization import fminsearchbnd
+from .textgrid import TextGrid
 
+
+def get_A1_A2_A3(y, fs, F0, F1, F2, F3, variables, textgridfile=None):
+    N_periods = variables["Nperiods"]
+    sampleshift = fs/1000 * variables["frameshift"]
+
+    A1 = np.zeros(len(F0, 1)) * np.nan
+    A2 = np.zeros(len(F0, 1)) * np.nan
+    A3 = np.zeros(len(F0, 1)) * np.nan
+
+    if textgridfile == None: # if no textgrid
+        for k in range(len(F0)):
+            ks = round(k * sampleshift)
+
+            if (ks <= 0 or ks > len(y)): continue
+
+            F0_curr = F0(k)
+
+            if (np.isnan(F0_curr) or F0_curr == 0): continue
+
+            N0_curr = 1 / F0_curr * fs
+
+            ystart = round(ks - N_periods/2*N0_curr)
+            yend = round(ks + N_periods/2*N0_curr) - 1
+
+            if ystart <= 0 or yend > len(y): continue
+
+            yseg = y[ystart:yend]
+
+            if (np.isnan(F1[k]) or np.isnan(F2[k]) or np.isnan(F3[k]) or np.isnan(N0_curr)):
+                A1_, fmax = ana_get_magnitude_max(yseg, F1[k], fs, 8192) #fmax unused?
+                A2_, fmax = ana_get_magnitude_max(yseg, F2[k], fs, 8192)
+                A3_, fmax = ana_get_magnitude_max(yseg, F3[k], fs, 8192)
+
+                A1[k] = A1_
+                A2[k] = A2_
+                A3[k] = A3_
+
+        return A1, A2, A3
+    else:
+        tbuffer = variables["tbuffer"]
+        fp = open(variables["TextgridIgnoreList"])
+        ignorelabels = np.loadtxt(fp, '\s', delimiter=",")
+        ignorelabels = ignorelabels[1]
+        fp.close()
+
+        tg = TextGrid()
+        tg.read(textgridfile)
+        pass
+
+
+
+def ana_get_magnitude_max(x, Fx, fs, fftlen):
+    if np.isnan(Fx):
+        return np.nan, np.nan
+
+    else:
+        length = len(x)
+        hamlen = min(fftlen, length) #unused?
+        factor = 1
+        X = fftpack.fft(x, fftlen)
+        for idx in range(len(X)):
+            if X[idx] == 0:
+                X[idx] = 0.000000001 # guard against log(0)
+
+        X = 20*np.log10(factor*abs(X[1:fftlen/2, :]))
+        fstep = fs/fftlen
+        lowf = Fx - 0.1*Fx
+        if lowf < 0: lowf = 0
+        highf = Fx + 0.1*Fx
+        if highf > fs/2 - fstep: highf = fs/2-fstep
+
+        M = np.zeros(len(Fx))
+        fmax = np.zeros(len(Fx))
+        for cnt in range(len(Fx)):
+            m, pos = max(X[1+round(lowf[cnt]/fstep):1+round(highf[cnt]/fstep), :])
+            fmax[cnt] = (pos-1+round(lowf(cnt)/fstep))*fstep
+            M[cnt] = m
+
+        return 
+
+
+# get maximal spectral magnitude of a signal x around position Fx in dB
 def get_harmonics(data, f_est, fs):
     df = 0.1
     df_range = round(f_est * df)
