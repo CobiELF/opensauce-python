@@ -4,7 +4,7 @@ import random
 import unittest
 import numpy as np
 
-from opensauce.harmonics import correction_iseli_i, bandwidth_hawks_miller
+from opensauce.harmonics import correction_iseli_i, bandwidth_hawks_miller, get_A1_A2_A3
 
 from test.support import TestCase, wav_fns, get_raw_data, get_harmonics_internal_test_data
 
@@ -14,6 +14,45 @@ random.shuffle(wav_fns)
 
 class TestHarmonicsInternal(TestCase):
     # Test internal functions from harmonics.py
+
+    def test_get_A1_A2_A3_against_voicesauce_data(self):
+        ax_param_table = np.array([['F0', 'F1', 'B1'],
+                                ['F0', 'F2', 'B2'],
+                                ['F3', 'F1', 'B1'],
+                                ['F3', 'F2', 'B2'],
+                                ['F3', 'F3', 'B3'],
+                                ['F1', 'F1', 'B1'],
+                                ['F1', 'F2', 'B2'],
+                                ['F2', 'F1', 'B1'],
+                                ['F2', 'F2', 'B2']])
+
+        for fn in wav_fns:
+            # Get some sample F0 and formant data
+            # There's nothing special about this data, it's just some
+            # realistic data for testing the internal harmonics functions
+            sample = {}
+            sample['Fs'] = get_raw_data(fn, 'Fs', 'strF0', 'FMTs', 'estimated')
+            sample['F0'] = get_raw_data(fn, 'sF0', 'strF0', 'FMTs', 'estimated')
+            sample['F1'] = get_raw_data(fn, 'sF1', 'strF0', 'FMTs', 'estimated')
+            sample['F2'] = get_raw_data(fn, 'sF2', 'strF0', 'FMTs', 'estimated')
+            sample['F3'] = get_raw_data(fn, 'sF3', 'strF0', 'FMTs', 'estimated')
+            sample['B1'] = get_raw_data(fn, 'sB1', 'strF0', 'FMTs', 'estimated')
+            sample['B2'] = get_raw_data(fn, 'sB2', 'strF0', 'FMTs', 'estimated')
+            sample['B3'] = get_raw_data(fn, 'sB3', 'strF0', 'FMTs', 'estimated')
+
+            # Compute a bunch of Iseli-Alwan harmonic amplitude corrections
+            num_calcs = ax_param_table.shape[0]
+            # Initialize table for storing OpenSauce Iseli calculations
+            # We expect each Iseli calculation to be the same length as the
+            # frequency vectors input to the arguments
+            os_ax = np.empty((num_calcs, len(sample['F1'])))
+            # Fill in the table, computing Iseli-Alwan corrections
+            for i in range(num_calcs):
+                p1 = sample[ax_param_table[i, 0]]
+                p2 = sample[ax_param_table[i, 1]]
+                p3 = sample[ax_param_table[i, 2]]
+                os_ax[i, :] = get_A1_A2_A3(None, None, None, None, None, None) #need args
+
 
     def test_iseli_against_voicesauce_data(self):
         # This table contains the names of the parameters used as arguments
